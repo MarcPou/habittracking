@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seguimiento de Hábitos Saludables</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/babel-standalone@6.26.0/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans">
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const App = () => {
+      const [habits, setHabits] = useState([]);
+      const [formData, setFormData] = useState({
+        breakfast: '',
+        midMorning: '',
+        snack: '',
+        dinner: '',
+        deviation: '',
+        exercise: 'Caminata',
+        exerciseDuration: '',
+        exerciseFeeling: '',
+        waterGlasses: 0,
+        waist: '',
+        hip: '',
+        thigh: '',
+        date: new Date().toISOString().split('T')[0]
+      });
+      const chartRef = useRef(null);
+
+      // Cargar datos de localStorage al iniciar
+      useEffect(() => {
+        const savedHabits = localStorage.getItem('habits');
+        if (savedHabits) {
+          setHabits(JSON.parse(savedHabits));
+        }
+      }, []);
+
+      // Guardar datos en localStorage al actualizar habits
+      useEffect(() => {
+        localStorage.setItem('habits', JSON.stringify(habits));
+      }, [habits]);
+
+      // Crear gráficos
+      useEffect(() => {
+        if (chartRef.current) {
+          chartRef.current.destroy();
+        }
+        const ctx = document.getElementById('progressChart').getContext('2d');
+        const weeklyData = getWeeklySummary();
+        const dates = weeklyData.map(h => h.date);
+        const waistData = weeklyData.map(h => h.waist || 0);
+        const hipData = weeklyData.map(h => h.hip || 0);
+        const thighData = weeklyData.map(h => h.thigh || 0);
+        const waterData = weeklyData.map(h => h.waterGlasses * 0.25 || 0);
+
+        chartRef.current = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: dates,
+            datasets: [
+              {
+                label: 'Cintura (cm)',
+                data: waistData,
+                borderColor: '#3b82f6',
+                fill: false
+              },
+              {
+                label: 'Cadera (cm)',
+                data: hipData,
+                borderColor: '#10b981',
+                fill: false
+              },
+              {
+                label: 'Muslo (cm)',
+                data: thighData,
+                borderColor: '#f59e0b',
+                fill: false
+              },
+              {
+                label: 'Agua (L)',
+                data: waterData,
+                borderColor: '#8b5cf6',
+                fill: false
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              y: { beginAtZero: false }
+            }
+          }
+        });
+
+        return () => {
+          if (chartRef.current) {
+            chartRef.current.destroy();
+          }
+        };
+      }, [habits]);
+
+      // Manejar cambios en el formulario
+      const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+      };
+
+      // Manejar contador de vasos de agua
+      const handleWaterChange = (increment) => {
+        setFormData(prev => ({
+          ...prev,
+          waterGlasses: Math.max(0, prev.waterGlasses + increment)
+        }));
+      };
+
+      // Manejar envío del formulario
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        setHabits([...habits, { ...formData, id: Date.now() }]);
+        setFormData({
+          breakfast: '',
+          midMorning: '',
+          snack: '',
+          dinner: '',
+          deviation: '',
+          exercise: 'Caminata',
+          exerciseDuration: '',
+          exerciseFeeling: '',
+          waterGlasses: 0,
+          waist: '',
+          hip: '',
+          thigh: '',
+          date: new Date().toISOString().split('T')[0]
+        });
+      };
+
+      // Descargar datos como JSON
+      const handleDownload = () => {
+        const dataStr = JSON.stringify(habits, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'habits.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      // Cargar datos desde archivo
+      const handleUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            try {
+              const uploadedHabits = JSON.parse(event.target.result);
+              setHabits(uploadedHabits);
+            } catch (error) {
+              alert('Error al cargar el archivo. Asegúrate de que sea un JSON válido.');
+            }
+          };
+          reader.readAsText(file);
+        }
+      };
+
+      // Filtrar hábitos de los últimos 7 días
+      const getWeeklySummary = () => {
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        return habits.filter(h => new Date(h.date) >= oneWeekAgo).sort((a, b) => new Date(a.date) - new Date(b.date));
+      };
+
+      return (
+        <div className="max-w-4xl mx-auto p-4 sm:p-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-center mb-6">Seguimiento de Hábitos Saludables</h1>
+          
+          {/* Formulario de registro */}
+          <form onSubmit={handleSubmit} className="bg-white p-4 sm:p-6 rounded-lg shadow-md mb-8">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4">Registrar Día</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium">Fecha</label>
+                <input
+                  type="date"
+                  name="date"
+                  value={formData.date}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Desayuno</label>
+                <input
+                  type="text"
+                  name="breakfast"
+                  value={formData.breakfast}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded text-sm"
+                  placeholder="Ej. Huevo con pan integral"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Media Mañana</label>
+                <input
+                  type="text"
+                  name="midMorning"
+                  value={formData.midMorning}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded text-sm"
+                  placeholder="Ej. Yogur con almendras"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Merienda</label>
+                <input
+                  type="text"
+                  name="snack"
+                  value={formData.snack}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded text-sm"
+                  placeholder="Ej. Manzana con crema de cacahuete"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Cena</label>
+                <input
+                  type="text"
+                  name="dinner"
+                  value={formData.dinner}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded text-sm"
+                  placeholder="Ej. Pescado con brócoli"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Desvíos/Almuerzo (opcional)</label>
+                <input
+                  type="text"
+                  name="deviation"
+                  value={formData.deviation}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded text-sm"
+                  placeholder="Ej. Pastel en casa de suegra"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Ejercicio (Nombre del circuito/actividad)</label>
+                <input
+                  type="text"
+                  name="exercise"
+                  value={formData.exercise}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded text-sm"
+                  placeholder="Ej. Caminata"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Duración (min)</label>
+                <input
+                  type="number"
+                  name="exerciseDuration"
+                  value={formData.exerciseDuration}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded text-sm"
+                  placeholder="Ej. 30"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Sensación post-ejercicio</label>
+                <input
+                  type="text"
+                  name="exerciseFeeling"
+                  value={formData.exerciseFeeling}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded text-sm"
+                  placeholder="Ej. Energizado"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Vasos de agua (250 ml c/u)</label>
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => handleWaterChange(-1)}
+                    className="bg-red-500 text-white p-2 rounded-l hover:bg-red-600"
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    name="waterGlasses"
+                    value={formData.waterGlasses}
+                    readOnly
+                    className="w-16 p-2 border-t border-b text-center"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleWaterChange(1)}
+                    className="bg-green-500 text-white p-2 rounded-r hover:bg-green-600"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Cintura (cm)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  name="waist"
+                  value={formData.waist}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded text-sm"
+                  placeholder="Ej. 85"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Cadera (cm)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  name="hip"
+                  value={formData.hip}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded text-sm"
+                  placeholder="Ej. 95"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Muslo (cm)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  name="thigh"
+                  value={formData.thigh}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded text-sm"
+                  placeholder="Ej. 55"
+                />
+              </div>
+            </div>
+            <button
+              type="submit"
+              className="mt-4 bg-blue-500 text-white p-2 rounded hover:bg-blue-600 w-full sm:w-auto"
+            >
+              Guardar Registro
+            </button>
+          </form>
+
+          {/* Botones de descarga y carga */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-8">
+            <button
+              onClick={handleDownload}
+              className="bg-purple-500 text-white p-2 rounded hover:bg-purple-600"
+            >
+              Descargar Datos
+            </button>
+            <label className="bg-gray-500 text-white p-2 rounded hover:bg-gray-600 cursor-pointer">
+              Cargar Datos
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleUpload}
+                className="hidden"
+              />
+            </label>
+          </div>
+
+          {/* Gráficos */}
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md mb-8">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4">Progreso Semanal</h2>
+            <canvas id="progressChart"></canvas>
+          </div>
+
+          {/* Resumen semanal */}
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4">Resumen Semanal</h2>
+            {getWeeklySummary().length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="bg-gray-200">
+                      <th className="p-2">Fecha</th>
+                      <th className="p-2">Desayuno</th>
+                      <th className="p-2">Media Mañana</th>
+                      <th className="p-2">Merienda</th>
+                      <th className="p-2">Cena</th>
+                      <th className="p-2">Desvíos</th>
+                      <th className="p-2">Ejercicio</th>
+                      <th className="p-2">Agua (vasos)</th>
+                      <th className="p-2">Cintura (cm)</th>
+                      <th className="p-2">Cadera (cm)</th>
+                      <th className="p-2">Muslo (cm)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getWeeklySummary().map(habit => (
+                      <tr key={habit.id} className="border-b">
+                        <td className="p-2">{habit.date}</td>
+                        <td className="p-2">{habit.breakfast || '-'}</td>
+                        <td className="p-2">{habit.midMorning || '-'}</td>
+                        <td className="p-2">{habit.snack || '-'}</td>
+                        <td className="p-2">{habit.dinner || '-'}</td>
+                        <td className="p-2">{habit.deviation || '-'}</td>
+                        <td className="p-2">{habit.exercise} ({habit.exerciseDuration} min, {habit.exerciseFeeling})</td>
+                        <td className="p-2">{habit.waterGlasses}</td>
+                        <td className="p-2">{habit.waist || '-'}</td>
+                        <td className="p-2">{habit.hip || '-'}</td>
+                        <td className="p-2">{habit.thigh || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-gray-500">No hay registros en los últimos 7 días.</p>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
