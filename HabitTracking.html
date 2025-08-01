@@ -31,7 +31,7 @@
         hip: '',
         thigh: '',
         date: new Date().toISOString().split('T')[0],
-        id: null // Para identificar si es edición
+        id: null
       });
       const [isEditing, setIsEditing] = useState(false);
       const chartRef = useRef(null);
@@ -152,12 +152,14 @@
       // Manejar envío del formulario
       const handleSubmit = (e) => {
         e.preventDefault();
-        if (isEditing) {
+        // Eliminar cualquier registro existente para la misma fecha
+        const updatedHabits = habits.filter(h => h.date !== formData.date);
+        if (isEditing && formData.id) {
           // Editar registro existente
-          setHabits(habits.map(h => h.id === formData.id ? { ...formData } : h));
+          setHabits([...updatedHabits, { ...formData }]);
         } else {
           // Crear nuevo registro
-          setHabits([...habits, { ...formData, id: Date.now() }]);
+          setHabits([...updatedHabits, { ...formData, id: Date.now() }]);
         }
         setFormData({
           breakfast: '',
@@ -176,6 +178,31 @@
           id: null
         });
         setIsEditing(false);
+      };
+
+      // Borrar todos los datos
+      const handleClearData = () => {
+        if (window.confirm('¿Estás seguro de que quieres borrar todos los datos? Esta acción no se puede deshacer.')) {
+          setHabits([]);
+          localStorage.removeItem('habits');
+          setFormData({
+            breakfast: '',
+            midMorning: '',
+            snack: '',
+            dinner: '',
+            deviation: '',
+            exercise: 'Caminata',
+            exerciseDuration: '',
+            exerciseFeeling: '',
+            waterGlasses: 0,
+            waist: '',
+            hip: '',
+            thigh: '',
+            date: new Date().toISOString().split('T')[0],
+            id: null
+          });
+          setIsEditing(false);
+        }
       };
 
       // Descargar datos como JSON
@@ -385,15 +412,24 @@
                 />
               </div>
             </div>
-            <button
-              type="submit"
-              className="mt-4 bg-blue-500 text-white p-2 rounded hover:bg-blue-600 w-full sm:w-auto"
-            >
-              {isEditing ? 'Actualizar Registro' : 'Guardar Registro'}
-            </button>
+            <div className="flex flex-col sm:flex-row gap-4 mt-4">
+              <button
+                type="submit"
+                className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600 w-full sm:w-auto"
+              >
+                {isEditing ? 'Actualizar Registro' : 'Guardar Registro'}
+              </button>
+              <button
+                type="button"
+                onClick={handleClearData}
+                className="bg-red-500 text-white p-2 rounded hover:bg-red-600 w-full sm:w-auto"
+              >
+                Borrar Todos los Datos
+              </button>
+            </div>
           </form>
 
-          {/* Botones de descarga y carga */}
+          {/* Botones de descarga eigenen carga */}
           <div className="flex flex-col sm:flex-row gap-4 mb-8">
             <button
               onClick={handleDownload}
