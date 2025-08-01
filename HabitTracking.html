@@ -30,8 +30,10 @@
         waist: '',
         hip: '',
         thigh: '',
-        date: new Date().toISOString().split('T')[0]
+        date: new Date().toISOString().split('T')[0],
+        id: null // Para identificar si es edición
       });
+      const [isEditing, setIsEditing] = useState(false);
       const chartRef = useRef(null);
 
       // Cargar datos de localStorage al iniciar
@@ -46,6 +48,33 @@
       useEffect(() => {
         localStorage.setItem('habits', JSON.stringify(habits));
       }, [habits]);
+
+      // Verificar si la fecha seleccionada tiene un registro
+      useEffect(() => {
+        const existingHabit = habits.find(h => h.date === formData.date);
+        if (existingHabit) {
+          setFormData({ ...existingHabit, id: existingHabit.id });
+          setIsEditing(true);
+        } else {
+          setFormData({
+            breakfast: '',
+            midMorning: '',
+            snack: '',
+            dinner: '',
+            deviation: '',
+            exercise: 'Caminata',
+            exerciseDuration: '',
+            exerciseFeeling: '',
+            waterGlasses: 0,
+            waist: '',
+            hip: '',
+            thigh: '',
+            date: formData.date,
+            id: null
+          });
+          setIsEditing(false);
+        }
+      }, [formData.date, habits]);
 
       // Crear gráficos
       useEffect(() => {
@@ -123,7 +152,13 @@
       // Manejar envío del formulario
       const handleSubmit = (e) => {
         e.preventDefault();
-        setHabits([...habits, { ...formData, id: Date.now() }]);
+        if (isEditing) {
+          // Editar registro existente
+          setHabits(habits.map(h => h.id === formData.id ? { ...formData } : h));
+        } else {
+          // Crear nuevo registro
+          setHabits([...habits, { ...formData, id: Date.now() }]);
+        }
         setFormData({
           breakfast: '',
           midMorning: '',
@@ -137,8 +172,10 @@
           waist: '',
           hip: '',
           thigh: '',
-          date: new Date().toISOString().split('T')[0]
+          date: new Date().toISOString().split('T')[0],
+          id: null
         });
+        setIsEditing(false);
       };
 
       // Descargar datos como JSON
@@ -183,7 +220,9 @@
           
           {/* Formulario de registro */}
           <form onSubmit={handleSubmit} className="bg-white p-4 sm:p-6 rounded-lg shadow-md mb-8">
-            <h2 className="text-lg sm:text-xl font-semibold mb-4">Registrar Día</h2>
+            <h2 className="text-lg sm:text-xl font-semibold mb-4">
+              {isEditing ? 'Editar Registro' : 'Registrar Día'}
+            </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium">Fecha</label>
@@ -350,7 +389,7 @@
               type="submit"
               className="mt-4 bg-blue-500 text-white p-2 rounded hover:bg-blue-600 w-full sm:w-auto"
             >
-              Guardar Registro
+              {isEditing ? 'Actualizar Registro' : 'Guardar Registro'}
             </button>
           </form>
 
